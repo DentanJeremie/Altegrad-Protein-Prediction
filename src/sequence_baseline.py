@@ -1,21 +1,27 @@
 import csv
+
 import numpy as np
 from sklearn.metrics import accuracy_score, log_loss
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 
+from src.utils.pathtools import project
+from src.utils.logging import logger
+
 # Read sequences
+logger.info('Reading the sequences...')
 sequences = list()
-with open('sequences.txt', 'r') as f:
+with project.sequences.open('r') as f:
     for line in f:
         sequences.append(line[:-1])
 
 # Split data into training and test sets
+logger.info('Spliting data into train and test set')
 sequences_train = list()
 sequences_test = list()
 proteins_test = list()
 y_train = list()
-with open('graph_labels.txt', 'r') as f:
+with project.graph_labels.open('r') as f:
     for i,line in enumerate(f):
         t = line.split(',')
         if len(t[1][:-1]) == 0:
@@ -37,7 +43,7 @@ clf.fit(X_train, y_train)
 y_pred_proba = clf.predict_proba(X_test)
 
 # Write predictions to a file
-with open('sample_submission.csv', 'w') as csvfile:
+with project.get_new_submission_file().open('w') as csvfile:
     writer = csv.writer(csvfile, delimiter=',')
     lst = list()
     for i in range(18):

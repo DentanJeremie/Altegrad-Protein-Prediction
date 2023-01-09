@@ -1,27 +1,29 @@
 import csv
 import time
+
 import numpy as np
 import scipy.sparse as sp
 from sklearn.metrics import accuracy_score, log_loss
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import optim
 
+from src.utils.pathtools import project
+
 def load_data(): 
     """
     Function that loads graphs
     """  
-    graph_indicator = np.loadtxt("graph_indicator.txt", dtype=np.int64)
+    graph_indicator = np.loadtxt(project.graph_indicator, dtype=np.int64)
     _,graph_size = np.unique(graph_indicator, return_counts=True)
     
-    edges = np.loadtxt("edgelist.txt", dtype=np.int64, delimiter=",")
+    edges = np.loadtxt(project.edgelist, dtype=np.int64, delimiter=",")
     A = sp.csr_matrix((np.ones(edges.shape[0]), (edges[:,0], edges[:,1])), shape=(graph_indicator.size, graph_indicator.size))
     A += A.T
     
-    x = np.loadtxt("node_attributes.txt", delimiter=",")
-    edge_attr = np.loadtxt("edge_attributes.txt", delimiter=",")
+    x = np.loadtxt(project.node_attributes, delimiter=",")
+    edge_attr = np.loadtxt(project.edge_attributes, delimiter=",")
     
     adj = []
     features = []
@@ -114,7 +116,7 @@ y_train = list()
 adj_test = list()
 features_test = list()
 proteins_test = list()
-with open('graph_labels.txt', 'r') as f:
+with project.graph_labels.open('r') as f:
     for i,line in enumerate(f):
         t = line.split(',')
         if len(t[1][:-1]) == 0:
@@ -225,7 +227,7 @@ y_pred_proba = torch.exp(y_pred_proba)
 y_pred_proba = y_pred_proba.detach().cpu().numpy()
 
 # Write predictions to a file
-with open('sample_submission.csv', 'w') as csvfile:
+with project.get_new_submission_file().open('w') as csvfile:
     writer = csv.writer(csvfile, delimiter=',')
     lst = list()
     for i in range(18):
