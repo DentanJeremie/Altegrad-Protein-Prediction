@@ -37,7 +37,7 @@ clf.fit(X_train, y_train)
 y_pred_proba = clf.predict_proba(X_test)
 
 # Write predictions to a file
-with open('sample_submission.csv', 'w') as csvfile:
+with open('data/sample_submission_sequenceBL.csv', 'w') as csvfile:
     writer = csv.writer(csvfile, delimiter=',')
     lst = list()
     for i in range(18):

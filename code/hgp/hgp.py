@@ -1,3 +1,5 @@
+import argparse
+
 import csv
 import time
 import numpy as np
@@ -12,7 +14,28 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import optim
 
-import prince
+from models import Model
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument('--seed', type=int, default=777, help='random seed')
+parser.add_argument('--batch_size', type=int, default=512, help='batch size')
+parser.add_argument('--lr', type=float, default=0.001, help='learning rate')
+parser.add_argument('--weight_decay', type=float, default=0.001, help='weight decay')
+parser.add_argument('--nhid', type=int, default=128, help='hidden size')
+parser.add_argument('--sample_neighbor', type=bool, default=True, help='whether sample neighbors')
+parser.add_argument('--sparse_attention', type=bool, default=True, help='whether use sparse attention')
+parser.add_argument('--structure_learning', type=bool, default=True, help='whether perform structure learning')
+parser.add_argument('--pooling_ratio', type=float, default=0.5, help='pooling ratio')
+parser.add_argument('--dropout_ratio', type=float, default=0.0, help='dropout ratio')
+parser.add_argument('--lamb', type=float, default=1.0, help='trade-off parameter')
+parser.add_argument('--dataset', type=str, default='PROTEINS', help='DD/PROTEINS/NCI1/NCI109/Mutagenicity/ENZYMES')
+parser.add_argument('--device', type=str, default='cuda:0', help='specify cuda devices')
+parser.add_argument('--epochs', type=int, default=1000, help='maximum number of epochs')
+parser.add_argument('--patience', type=int, default=100, help='patience for early stopping')
+
+args = parser.parse_args()
+
 
 def load_data(): 
     """
@@ -25,6 +48,8 @@ def load_data():
     A = sp.csr_matrix((np.ones(edges.shape[0]), (edges[:,0], edges[:,1])), shape=(graph_indicator.size, graph_indicator.size))
     A += A.T
     
+    x = np.loadtxt("data/node_attributes.txt", delimiter=",")
+    edge_attr = np.loadtxt("data/edge_attributes.txt", delimiter=",")
     
     #Process node attributes
     x = pd.DataFrame(x)
@@ -167,13 +192,19 @@ dropout = 0.2
 learning_rate = 0.001
 n_class = 18
 
+#args
+args.num_classes = n_class
+args.num_features = n_input
+
 # Compute number of training and test samples
 N_train = len(adj_train)
 N_test = len(adj_test)
 
 # Initializes model and optimizer
-model = GNN(n_input, n_hidden, dropout, n_class).to(device)
-optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+#model = GNN(n_input, n_hidden, dropout, n_class).to(device)
+model = Model(args).to(device)
+#optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+optimizer = optim.Adam(model.parameters(), lr = args.lr, weight_decay = args.weight_decay)
 loss_function = nn.CrossEntropyLoss()
 
 # Train model
@@ -207,14 +238,6 @@ for epoch in range(epochs):
         y_batch = torch.LongTensor(y_batch).to(device)
         
         optimizer.zero_grad()
-        print('features_batch :')
-        print(features_batch)
-        print('adj_batch :')
-        print(adj_batch)
-        print('idx batch :')
-        print(idx_batch)
-        break
-"""
         output = model(features_batch, adj_batch, idx_batch)
         loss = loss_function(output, y_batch)
         train_loss += loss.item() * output.size(0)
@@ -262,7 +285,7 @@ y_pred_proba = torch.exp(y_pred_proba)
 y_pred_proba = y_pred_proba.detach().cpu().numpy()
 
 # Write predictions to a file
-with open('sample_submissionX.csv', 'w') as csvfile:
+with open('sample_submissionHGP1.csv', 'w') as csvfile:
     writer = csv.writer(csvfile, delimiter=',')
     lst = list()
     for i in range(18):
@@ -273,4 +296,3 @@ with open('sample_submissionX.csv', 'w') as csvfile:
         lst = y_pred_proba[i,:].tolist()
         lst.insert(0, protein)
         writer.writerow(lst)
-"""
