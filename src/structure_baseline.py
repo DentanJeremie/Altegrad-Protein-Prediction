@@ -25,7 +25,6 @@ def load_data():
     A = sp.csr_matrix((np.ones(edges.shape[0]), (edges[:,0], edges[:,1])), shape=(graph_indicator.size, graph_indicator.size))
     A += A.T
     
-    
     #Process node attributes
     x = pd.DataFrame(x)
     columns_encoded = list(range(3,23))+[24,25]
@@ -207,14 +206,6 @@ for epoch in range(epochs):
         y_batch = torch.LongTensor(y_batch).to(device)
         
         optimizer.zero_grad()
-        print('features_batch :')
-        print(features_batch)
-        print('adj_batch :')
-        print(adj_batch)
-        print('idx batch :')
-        print(idx_batch)
-        break
-"""
         output = model(features_batch, adj_batch, idx_batch)
         loss = loss_function(output, y_batch)
         train_loss += loss.item() * output.size(0)
@@ -273,4 +264,3 @@ with open('sample_submissionX.csv', 'w') as csvfile:
         lst = y_pred_proba[i,:].tolist()
         lst.insert(0, protein)
         writer.writerow(lst)
-"""
