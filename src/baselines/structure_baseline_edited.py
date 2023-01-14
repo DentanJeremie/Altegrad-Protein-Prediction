@@ -2,21 +2,17 @@ import csv
 import time
 import numpy as np
 import scipy.sparse as sp
-import pandas as pd
-from sklearn.metrics import accuracy_score, log_loss
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import optim
 
+from src.utils.constants import STRUCTURE_BASELINE_FEATURE_NAME as FEATURE_NAME
 from src.utils.pathtools import project
 from src.utils.logging import logger
 from src.utils.structure_data import StructureData, structure_data, sparse_mx_to_torch_sparse_tensor
 
-FEATURE_NAME = 'structure_baseline'
 USE_PCA = False
 EPOCH_VERBOSE = 5
 EPOCHS = 1

@@ -4,6 +4,7 @@ import scipy.sparse as sp
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 
+from src.utils.constants import SEQUENCE_BASELINE_FEATURE_NAME as FEATURE_NAME
 from src.utils.pathtools import project
 from src.utils.logging import logger
 from src.utils.sequence_data import SequenceData, sequence_data
@@ -11,7 +12,6 @@ from src.utils.sequence_data import SequenceData, sequence_data
 VECTORIZER_ANALYSER = 'char'
 VECTORIZER_NGRAMS_RANGE = (1, 3)
 LOGIT_SOLVER = 'liblinear'
-FEATURE_NAME = 'sequence_baseline'
 
 
 class SequenceBaseline():
