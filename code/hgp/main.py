@@ -10,8 +10,7 @@ import torch
 import torch.nn.functional as F
 from models import Model
 from torch.utils.data import random_split
-from torch_geometric.data import Data
-from torch_geometric.loader import DataLoader
+from torch_geometric.data import Data, DataLoader
 from torch_geometric.datasets import TUDataset
 
 from utils import load_data, normalize_adjacency

@@ -39,72 +39,72 @@ class StructureData():
     @property
     def adjacency_matrixes(self):
         if self._adjacency_matrixes is None:
-            self.build()
+            self.build_structure_data()
         return self._adjacency_matrixes
 
     @property
     def node_features(self):
         if self._node_features is None:
-            self.build()
+            self.build_structure_data()
         return self._node_features
 
     @property
     def edge_features(self):
         if self._edge_features is None:
-            self.build()
+            self.build_structure_data()
         return self._edge_features
 
     @property
     def adjacency_matrixes_hgp(self):
         if self._adjacency_matrixes_hgp is None:
-            self.build()
+            self.build_structure_data_for_hgp()
         return self._adjacency_matrixes_hgp
 
     @property
     def node_features_hgp(self):
         if self._node_features_hgp is None:
-            self.build()
+            self.build_structure_data_for_hgp()
         return self._node_features_hgp
 
     @property
     def edge_features_hgp(self):
         if self._edge_features_hgp is None:
-            self.build()
+            self.build_structure_data_for_hgp()
         return self._edge_features_hgp
 
     @property
     def edge_index_hgp(self):
         if self._edge_index_hgp is None:
-            self.build()
+            self.build_structure_data_for_hgp()
         return self._edge_index_hgp
 
     @property
     def reduced_node_features(self):
         if self._reduced_node_features is None:
-            self.build()
+            self.build_structure_data(pca_reduction=True)
         return self._reduced_node_features
 
     @property
     def reduced_edge_features(self):
         if self._reduced_edge_features is None:
-            self.build()
+            self.build_structure_data(pca_reduction=True)
         return self._reduced_edge_features
 
     @property
     def reduced_node_features_hgp(self):
         if self._reduced_node_features_hgp is None:
-            self.build()
+            self.build_structure_data_for_hgp(pca_reduction=True)
         return self._reduced_node_features_hgp
 
     @property
     def reduced_edge_features_hgp(self):
         if self._reduced_edge_features_hgp is None:
-            self.build()
+            self.build_structure_data_for_hgp(pca_reduction=True)
         return self._reduced_edge_features_hgp
 
 # ------------------ RAW DATA STRUCTURE ------------------
 
-    def get_structure_data(self, pca_reduction: bool = False) -> t.Tuple[
+    def build_structure_data(self, pca_reduction: bool = False) -> t.Tuple[
         t.List[sp.csr_matrix],
         t.List[np.ndarray],
         t.List[np.ndarray],
@@ -123,6 +123,11 @@ class StructureData():
         :param pca_reduction: A boolean indicating if the features must be reduced with PCA
         :returns: The tuple  `(adjacency_matrixes, node_features, edge_features)`
         """
+        if pca_reduction:
+            logger.info('Building raw structure data...')
+        else:
+            logger.info('Building raw structure data reduced with PCA...')
+
         graph_indicator = np.loadtxt(project.graph_indicator, dtype=np.int64)
         _, graph_size = np.unique(graph_indicator, return_counts=True)
         edges = np.loadtxt(project.edgelist, dtype=np.int64, delimiter=",")
@@ -147,9 +152,23 @@ class StructureData():
             idx_n += graph_size[i]
             idx_m += adjacency_matrixes[i].nnz
 
-        return adjacency_matrixes, node_features, edge_features
+        # Storing the results
+        if not pca_reduction:
+            (
+                self._adjacency_matrixes,
+                self._node_features,
+                self._edge_features
+            ) = adjacency_matrixes, node_features, edge_features
+        else:
+            (
+                self._adjacency_matrixes,
+                self._reduced_node_features,
+                self._reduced_edge_features
+            ) = adjacency_matrixes, node_features, edge_features
 
-    def get_structure_data_for_hgp(self, pca_reduction: bool = False) -> t.Tuple[
+        self.normalize_adjacency(self._adjacency_matrixes)
+
+    def build_structure_data_for_hgp(self, pca_reduction: bool = False) -> t.Tuple[
         t.List[sp.csr_matrix],
         t.List[np.ndarray],
         t.List[np.ndarray],
@@ -175,6 +194,10 @@ class StructureData():
         :param pca_reduction: A boolean indicating if the features must be reduced with PCA
         :returns: The tuple  `(adjacency_matrixes, node_features, edge_features, edge_index)`
         """
+        if pca_reduction:
+            logger.info('Building raw structure data for HGP...')
+        else:
+            logger.info('Building raw structure data for HGP reduced with PCA...')
 
         graph_indicator = np.loadtxt(project.graph_indicator, dtype=np.int64)
         _, graph_size = np.unique(graph_indicator, return_counts=True)
@@ -221,7 +244,23 @@ class StructureData():
             idx_n += graph_size[i]
             idx_m += adjacency_matrixes[i].nnz
 
-        return adjacency_matrixes, node_features, edge_features, edge_index
+        # Storing the results
+        if not pca_reduction:
+            (
+                self._adjacency_matrixes_hgp,
+                self._node_features_hgp,
+                self._edge_features_hgp,
+                self._edge_index_hgp,
+            ) = adjacency_matrixes, node_features, edge_features, edge_index
+        else:
+            (
+                self._adjacency_matrixes_hgp,
+                self._reduced_node_features_hgp,
+                self._reduced_edge_features_hgp,
+                self._edge_index_hgp,
+            ) = adjacency_matrixes, node_features, edge_features, edge_index
+
+        self.normalize_adjacency(self._adjacency_matrixes_hgp)
 
 # ------------------ PCA ------------------
 
@@ -259,79 +298,37 @@ class StructureData():
 
         return node_features_reduced, edge_features_reduced
 
-# ------------------ BUILD ------------------
-    
-    def build(self):
-        """Builds the attributes of the structure data.
-        """
-        logger.info('Building raw structure data...')
-        (
-            self._adjacency_matrixes,
-            self._node_features,
-            self._edge_features
-        ) = self.get_structure_data(pca_reduction=False)
-        logger.info('Building PCA reduced structure data...')
-        (
-            _,
-            self._reduced_node_features,
-            self._reduced_edge_features
-        ) = self.get_structure_data(pca_reduction=True)
-        logger.info('Building raw structure data for hgp...')
-        (
-            self._adjacency_matrixes_hgp,
-            self._node_features_hgp,
-            self._edge_features_hgp,
-            self._edge_index_hgp,
-        ) = self.get_structure_data_for_hgp(pca_reduction=False)
-        logger.info('Building PCA reduced structure data for hgp...')
-        (
-            _,
-            self._reduced_node_features_hgp,
-            self._reduced_edge_features_hgp,
-            _,
-        ) = self.get_structure_data_for_hgp(pca_reduction=True)
-        logger.info('Renormalizing structure data...')
-        self.normalize_adjacency()
-
 # ------------------ UTILS ------------------
 
-    def normalize_adjacency(self) -> None:
-        """
-        Normalizes the adjacency matrixes in `self.adjacency_matrixes` and `self.adjacency_matrixes_hgp`:
+    def normalize_adjacency(self, adjacency_matrixes: t.List[sp.csr_matrix]) -> None:
+        """Normalizes the adjacency matrixes in the input list:
         * Adds the identity
         * Normalizes each line by the inverse degree of its corresponding node
+
+        :param adjacency_matrix: The list of adjacency matrixes to normalize
+        :returns: None, the matrixes are normalized in place in the list.
         """
-        for graph_index in range(len(self.adjacency_matrixes)):
-            adj = self.adjacency_matrixes[graph_index]
+        for graph_index in range(len(adjacency_matrixes)):
+            adj = adjacency_matrixes[graph_index]
             n = adj.shape[0]
             adj = adj + sp.identity(n)
             degs = adj.dot(np.ones(n))
             inv_degs = np.power(degs, -1)
             diags = sp.diags(inv_degs)
             adj_normalized = diags.dot(adj)
-            self.adjacency_matrixes[graph_index] = adj_normalized
+            adjacency_matrixes[graph_index] = adj_normalized
 
-        for graph_index in range(len(self._adjacency_matrixes_hgp)):
-            adj = self.adjacency_matrixes_hgp[graph_index]
-            n = adj.shape[0]
-            adj = adj + sp.identity(n)
-            degs = adj.dot(np.ones(n))
-            inv_degs = np.power(degs, -1)
-            diags = sp.diags(inv_degs)
-            adj_normalized = diags.dot(adj)
-            self._adjacency_matrixes_hgp[graph_index] = adj_normalized
+def sparse_mx_to_torch_sparse_tensor(sparse_mx: sp.csr_matrix) -> torch.tensor:
+    """
+    Converts a Scipy sparse matrix to a sparse Torch tensor.
 
-    def sparse_mx_to_torch_sparse_tensor(self, sparse_mx: sp.csr_matrix) -> torch.tensor:
-        """
-        Converts a Scipy sparse matrix to a sparse Torch tensor.
-
-        :param sparse_mx: The input Scipy sparse matrix
-        :returns: The converted Torch sparse tensor
-        """
-        sparse_mx = sparse_mx.tocoo().astype(np.float32)
-        indices = torch.from_numpy(np.vstack((sparse_mx.row, sparse_mx.col)).astype(np.int64))
-        values = torch.from_numpy(sparse_mx.data)
-        shape = torch.Size(sparse_mx.shape)
-        return torch.sparse.FloatTensor(indices, values, shape)
+    :param sparse_mx: The input Scipy sparse matrix
+    :returns: The converted Torch sparse tensor
+    """
+    sparse_mx = sparse_mx.tocoo().astype(np.float32)
+    indices = torch.from_numpy(np.vstack((sparse_mx.row, sparse_mx.col)).astype(np.int64))
+    values = torch.from_numpy(sparse_mx.data)
+    shape = torch.Size(sparse_mx.shape)
+    return torch.sparse.FloatTensor(indices, values, shape)
 
 structure_data = StructureData()

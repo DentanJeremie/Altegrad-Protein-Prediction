@@ -153,28 +153,24 @@ class CustomizedPath():
         """
         return self.mkdir_if_not_exists(self.features / feature_name)
 
-    def get_new_feature_file(self, feature_name: str, feature_type: str):
-        """Returns a new feature file for a given class and a given type of feature.
+    def get_new_feature_file(self, feature_name: str):
+        """Returns a new feature file for a given class.
         Ex of class of feature: `'hgp'`
-        Ex of type of feature: `'full_train'`
 
         :param feature_name: The class of feature
-        :param feature_type: The type of feature
         :returns: The path to the new file
         """
         parent_folder = self.get_feature_folder(feature_name)
-        result = parent_folder / f'{feature_type}_{feature_name}_{datetime.datetime.now().strftime("features_%Y_%m%d__%H_%M_%S")}.csv'
+        result = parent_folder / f'{feature_name}_{datetime.datetime.now().strftime("features_%Y_%m%d__%H_%M_%S")}.csv'
         with result.open('w') as f:
             pass
         return result
 
-    def get_latest_features(self, feature_name: str, feature_type: str):
-        """Returns the latest feature file for a given class and a given type of feature.
+    def get_latest_features(self, feature_name: str):
+        """Returns the latest feature file for a given class.
         Ex of class of feature: `'hgp'`
-        Ex of type of feature: `'full_train'`
 
         :param feature_name: The class of feature
-        :param feature_type: The type of feature
         :returns: The path to the feature file
         """
         parent_folder = self.get_feature_folder(feature_name)
@@ -182,7 +178,6 @@ class CustomizedPath():
             str(path)
             for path in parent_folder.iterdir()
             if path.is_file()
-            and feature_type in str(path)
         ])
 
         if len(files) == 0:
