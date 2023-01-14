@@ -31,10 +31,10 @@ class Model(torch.nn.Module):
         self.lin2 = torch.nn.Linear(self.nhid, self.nhid // 2)
         self.lin3 = torch.nn.Linear(self.nhid // 2, self.num_classes)
 
-    def forward(self, x, edge_index, batch):
-        #x, edge_index, batch = data.x, data.edge_index, data.batch
-        edge_attr = None
-
+    def forward(self, data):
+        x, edge_index, batch, edge_attr = data.x, data.edge_index, data.batch, data.edge_attr
+        #edge_attr = None
+        print(edge_index)
         x = F.relu(self.conv1(x, edge_index, edge_attr))
         x, edge_index, edge_attr, batch = self.pool1(x, edge_index, edge_attr, batch)
         x1 = torch.cat([gmp(x, batch), gap(x, batch)], dim=1)
