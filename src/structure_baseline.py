@@ -18,14 +18,26 @@ def load_data():
     """
     Function that loads graphs
     """  
-    graph_indicator = np.loadtxt("data/graph_indicator.txt", dtype=np.int64)
     _,graph_size = np.unique(graph_indicator, return_counts=True)
     
     edges = np.loadtxt("data/edgelist.txt", dtype=np.int64, delimiter=",")
+    edges = np.loadtxt("edgelist.txt", dtype=np.int64, delimiter=",")
+    edges_inv = np.vstack((edges[:,1], edges[:,0]))
+    edges = np.vstack((edges, edges_inv.T))
+    s = edges[:,0]*graph_indicator.size + edges[:,1]
+    idx_sort = np.argsort(s)
+    edges = edges[idx_sort,:]
+    edges,idx_unique =  np.unique(edges, axis=0, return_index=True)
     A = sp.csr_matrix((np.ones(edges.shape[0]), (edges[:,0], edges[:,1])), shape=(graph_indicator.size, graph_indicator.size))
-    A += A.T
     
-    #Process node attributes
+    x = np.loadtxt("node_attributes.txt", delimiter=",")
+    edge_attr = np.loadtxt("edge_attributes.txt", delimiter=",")
+    edge_attr = np.vstack((edge_attr,edge_attr))
+    edge_attr = edge_attr[idx_sort,:]
+    edge_attr = edge_attr[idx_unique,:]
+
+    """
+     #Process node attributes
     x = pd.DataFrame(x)
     columns_encoded = list(range(3,23))+[24,25]
     columns_to_scale  = [0,1,2]+list(range(25,86))
@@ -48,7 +60,7 @@ def load_data():
     pca = PCA(n_components=0.95)
     pca.fit(edge_attr)
     edge_attr = pca.transform(edge_attr)
-
+    """
     adj = []
     features = []
     edge_features = []
