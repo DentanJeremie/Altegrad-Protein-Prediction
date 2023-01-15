@@ -10,7 +10,8 @@ import torch
 import torch.nn.functional as F
 from models import Model
 from torch.utils.data import random_split
-from torch_geometric.data import Data, DataLoader
+from torch_geometric.data import Data
+from torch_geometric.loader import DataLoader
 from torch_geometric.datasets import TUDataset
 
 from utils import load_data, normalize_adjacency
@@ -55,18 +56,18 @@ adj, features, edge_features, edge_index = load_data()
 
 adj = [normalize_adjacency(A) for A in adj]
 
-adj = [normalize_adjacency(A) for A in adj]
-
 # Split data into training and test sets
 adj_train = list()
 features_train = list()
 y_train = list()
 edge_index_train = list()
+edge_features_train = list()
 
 adj_test = list()
 features_test = list()
 proteins_test = list()
 edge_index_test = list()
+edge_features_test = list()
 
 with open(path+'graph_labels.txt', 'r') as f:
     for i,line in enumerate(f):
@@ -74,17 +75,19 @@ with open(path+'graph_labels.txt', 'r') as f:
         if len(t[1][:-1]) == 0:
             proteins_test.append(t[0])
             adj_test.append(torch.from_numpy(adj[i].toarray()))
-            features_test.append(torch.from_numpy(features[i]))
+            features_test.append(torch.from_numpy(features[i]).float())
             edge_index_test.append(edge_index[i])
+            edge_features_test.append(torch.from_numpy(edge_features[i]))
         else:
             adj_train.append(torch.from_numpy(adj[i].toarray()))
-            features_train.append(torch.from_numpy(features[i]))
+            features_train.append(torch.from_numpy(features[i]).float())
             y_train.append(torch.from_numpy(np.array(int(t[1][:-1]))))
             edge_index_train.append(edge_index[i])
+            edge_features_train.append(torch.from_numpy(edge_features[i]))
 
 
-dataset = [Data(x=features_train[i], edge_index = edge_index_train[i], edge_attr = features_train[i], y = y_train[i]) for i in range(len(y_train))]
-test_set = [Data(x=features_test[i], edge_index = edge_index_test[i], edge_attr = features_test[i]) for i in range(len(proteins_test))]
+dataset = [Data(x=features_train[i], edge_index = edge_index_train[i], edge_attr = edge_features_train[i], y = y_train[i]) for i in range(len(y_train))]
+test_set = [Data(x=features_test[i], edge_index = edge_index_test[i], edge_attr = edge_features_test[i]) for i in range(len(proteins_test))]
 
 args.num_classes = n_class
 args.num_features = n_input
@@ -99,7 +102,6 @@ test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=False)
 
 model = Model(args).to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-
 
 def train():
     min_loss = 1e10
@@ -158,6 +160,18 @@ def train():
 
 def compute_test(loader):
     model.eval()
+    correct = 0.0
+    loss_test = 0.0
+    for data in loader:
+        data = data.to(args.device)
+        out = model(data)
+        pred = out.max(dim=1)[1]
+        correct += pred.eq(data.y).sum().item()
+        loss_test += F.nll_loss(out, data.y).item()
+    return correct / len(loader.dataset), loss_test
+
+def compute_test_final(loader):
+    model.eval()
     y_pred_proba = list()
     for data in loader:
         data = data.to(args.device)
@@ -174,9 +188,9 @@ if __name__ == '__main__':
     best_model = train()
     # Restore best model for test set
     model.load_state_dict(torch.load('{}.pth'.format(best_model)))
-    y_pred_proba = compute_test(test_loader)
+    y_pred_proba = compute_test_final(test_loader)
     # Write predictions to a file
-    with open('sample_submissionHGP1.csv', 'w') as csvfile:
+    with open('sample_submissionHGP11.csv', 'w') as csvfile:
         writer = csv.writer(csvfile, delimiter=',')
         lst = list()
         for i in range(18):

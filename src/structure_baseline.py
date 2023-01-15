@@ -18,6 +18,7 @@ def load_data():
     """
     Function that loads graphs
     """  
+    graph_indicator = np.loadtxt("graph_indicator.txt", dtype=np.int64)
     _,graph_size = np.unique(graph_indicator, return_counts=True)
     
     edges = np.loadtxt("data/edgelist.txt", dtype=np.int64, delimiter=",")

@@ -34,7 +34,6 @@ class Model(torch.nn.Module):
     def forward(self, data):
         x, edge_index, batch, edge_attr = data.x, data.edge_index, data.batch, data.edge_attr
         #edge_attr = None
-        print(edge_index)
         x = F.relu(self.conv1(x, edge_index, edge_attr))
         x, edge_index, edge_attr, batch = self.pool1(x, edge_index, edge_attr, batch)
         x1 = torch.cat([gmp(x, batch), gap(x, batch)], dim=1)
