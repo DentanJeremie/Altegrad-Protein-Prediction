@@ -138,6 +138,52 @@ class CustomizedPath():
 
         return result
 
+# ------------------ FEATURES ------------------
+
+    @property
+    def features(self):
+        return self.mkdir_if_not_exists(self.output / 'features')
+
+    def get_feature_folder(self, feature_name):
+        """Returns the feature folder for a given class of feature.
+        Ex of class of feature: `'hgp'`
+
+        :param feature_name: The class of feature
+        :returns: The path to the folder
+        """
+        return self.mkdir_if_not_exists(self.features / feature_name)
+
+    def get_new_feature_file(self, feature_name: str):
+        """Returns a new feature file for a given class.
+        Ex of class of feature: `'hgp'`
+
+        :param feature_name: The class of feature
+        :returns: The path to the new file
+        """
+        parent_folder = self.get_feature_folder(feature_name)
+        result = parent_folder / f'{feature_name}_{datetime.datetime.now().strftime("features_%Y_%m%d__%H_%M_%S")}.csv'
+        with result.open('w') as f:
+            pass
+        return result
+
+    def get_latest_features(self, feature_name: str):
+        """Returns the latest feature file for a given class.
+        Ex of class of feature: `'hgp'`
+
+        :param feature_name: The class of feature
+        :returns: The path to the feature file
+        """
+        parent_folder = self.get_feature_folder(feature_name)
+        files = sorted([
+            str(path)
+            for path in parent_folder.iterdir()
+            if path.is_file()
+        ])
+
+        if len(files) == 0:
+            return None
+        return Path(files[-1])
+
 # ------------------ SUBMISSIONS ------------------
     
     @property
