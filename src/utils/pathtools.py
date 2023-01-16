@@ -138,6 +138,52 @@ class CustomizedPath():
 
         return result
 
+# ------------------ EMBEDDINGS ------------------
+
+    @property
+    def embeddings(self):
+        return self.mkdir_if_not_exists(self.output / 'embeddings')
+
+    def get_embedding_folder(self, embedding_name):
+        """Returns the embedding folder for a given class of embedding.
+        Ex of class of embedding: `'prot_bert'`
+
+        :param embedding_name: The class of embedding
+        :returns: The path to the folder
+        """
+        return self.mkdir_if_not_exists(self.embeddings / embedding_name)
+
+    def get_new_embedding_file(self, embedding_name: str):
+        """Returns a new embedding file for a given class.
+        Ex of class of embedding: `'hgp'`
+
+        :param embedding_name: The class of embedding
+        :returns: The path to the new file
+        """
+        parent_folder = self.get_embedding_folder(embedding_name)
+        result = parent_folder / f'{embedding_name}_{datetime.datetime.now().strftime("embeddings_%Y_%m%d__%H_%M_%S")}.csv'
+        with result.open('w') as f:
+            pass
+        return result
+
+    def get_latest_embeddings(self, embedding_name: str):
+        """Returns the latest embedding file for a given class.
+        Ex of class of embedding: `'hgp'`
+
+        :param embedding_name: The class of embedding
+        :returns: The path to the embedding file
+        """
+        parent_folder = self.get_embedding_folder(embedding_name)
+        files = sorted([
+            str(path)
+            for path in parent_folder.iterdir()
+            if path.is_file()
+        ])
+
+        if len(files) == 0:
+            return None
+        return Path(files[-1])
+
 # ------------------ FEATURES ------------------
 
     @property

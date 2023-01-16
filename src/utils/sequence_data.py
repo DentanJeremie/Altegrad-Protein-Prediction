@@ -110,7 +110,7 @@ class SequenceData():
                 self._sequences_validation.append(seq)
                 self._y_validation.append(sets_manager.get_label(index))
             if sets_manager.is_test(index):
-                self._proteins_test.append(sets_manager.index_to_protein(index))
                 self._sequences_test.append(seq)
+                self._proteins_test.append(sets_manager.index_to_protein(index))
 
 sequence_data = SequenceData()

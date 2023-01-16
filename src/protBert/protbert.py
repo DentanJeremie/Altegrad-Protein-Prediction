@@ -10,7 +10,6 @@ from src.utils.sequence_data import sequence_data
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-checkpoint = project.data / 'protT5_checkpoints' / 'secstruct_checkpoint.pt'
 output = project.output / 'prot_embeddings.h5'
 sequences = {
     k: item
