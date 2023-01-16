@@ -7,7 +7,6 @@ Script used to manage the TRAIN-VALIDATION-TEST sets of the project.
 
 import typing as t
 
-import numpy as np
 from numpy.random import RandomState
 
 from src.utils.pathtools import project
@@ -23,6 +22,7 @@ class SetsManager():
         Each of those attributes is a list whose elements are dicts {'protein_id':prot_id, 'index':prot_index}
         for the corresponding sets.
         """
+        # Private attributes with properties
         self._full_train: t.List[t.Dict] = None
         self._train: t.List[t.Dict] = None
         self._validation: t.List[t.Dict] = None
@@ -33,6 +33,11 @@ class SetsManager():
         self._validation_indexes: t.List[int] = None
         self._test_ids: t.List[str] = None
         self._test_indexes: t.List[int] = None
+        self._labels: t.Dict[t.Union[str, int], int] = None
+
+        # Private attributes without properties
+        self._idx_to_ids: t.Dict[int, str] = None
+        self._ids_to_idx: t.Dict[str, int] = None
 
 # ------------------ PROPERTIES ------------------
 
@@ -96,6 +101,12 @@ class SetsManager():
             self.build()
         return self._test_indexes
 
+    @property
+    def labels(self):
+        if self._labels is None:
+            self.build()
+        return self._labels
+
 # ------------------ BUILDS ------------------
     
     def build(self):
@@ -133,6 +144,15 @@ class SetsManager():
         self._test_ids = [elt['protein_id'] for elt in self._test]
         self._test_indexes = [elt['index'] for elt in self._test]
 
+        # Inverse dicts
+        self._ids_to_idx = dict()
+        self._idx_to_ids = dict()
+        for elt in self._full_train:
+            self._idx_to_ids[elt['index']] = elt['protein_id']
+            self._ids_to_idx[elt['protein_id']] = elt['index']
+        for elt in self.test:
+            self._idx_to_ids[elt['index']] = elt['protein_id']
+            self._ids_to_idx[elt['protein_id']] = elt['index']
 
     def load_test_full_train(self):
         """Initiates `self._test` and `self._full_train`.
@@ -142,6 +162,7 @@ class SetsManager():
         """
         self._test = list()
         self._full_train = list()
+        self._labels = dict()
 
         logger.debug('Reading the data to separate full_train and test sets...')
         with project.graph_labels.open('r') as f:
@@ -157,6 +178,8 @@ class SetsManager():
                         'protein_id':t[0],
                         'index':i,
                     })
+                    self._labels[t[0]] = int(t[1][:-1])
+                    self._labels[i] = int(t[1][:-1])
 
 # ------------------ METHODS ------------------
 
@@ -201,5 +224,38 @@ class SetsManager():
             return id in self.test_indexes
             
         raise ValueError('Incorrect ID type provided.')
+
+    def get_label(self, id: t.Union[str, int]) -> int:
+        """Given either a protein index or a protein ID, returns its label
+        if it's in the train or validation set.
+        
+        :param id: Either the protein index of it ID
+        :return: The label
+        """
+        if id in self.labels:
+            return self.labels[id]
+        raise IndexError('You asked for the label of a protein that is not in the train nor the validation set.')
+
+    def protein_to_index(self, id: str) -> int:
+        """Given the ID of a protein, returns its index.
+        
+        :param id: The ID of the proteins
+        :returns: Its index
+        """
+        if self._ids_to_idx is None:
+            self.build()
+        
+        return self._ids_to_idx[id]
+
+    def index_to_protein(self, id: str) -> int:
+        """Given the index of a protein, returns its ID.
+        
+        :param id: The index of the proteins
+        :returns: Its ID
+        """
+        if self._idx_to_ids is None:
+            self.build()
+        
+        return self._idx_to_ids[id]
 
 sets_manager = SetsManager()
