@@ -47,7 +47,8 @@ def load_data():
     idx_m = 0
     for i in range(graph_size.size):
         adj.append(A[idx_n:idx_n+graph_size[i],idx_n:idx_n+graph_size[i]])
-        edge_features.append(edge_attr[idx_m:idx_m+adj[i].nnz,:])
+        #edge_features.append(edge_attr[idx_m:idx_m+adj[i].nnz,:])
+        edge_features.append(edge_attr[idx_m:idx_m+adj[i].nnz,0])
         features.append(x[idx_n:idx_n+graph_size[i],:])
         edge_index_raw = torch.from_numpy(np.array([edges[idx_m:idx_m+adj[i].nnz][:,0], edges[idx_m:idx_m+adj[i].nnz][:,1]]))
         edge_index.append(edge_index_raw - edge_index_raw.min())

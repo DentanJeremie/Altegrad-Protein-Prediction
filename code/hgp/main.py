@@ -74,16 +74,16 @@ with open(path+'graph_labels.txt', 'r') as f:
         t = line.split(',')
         if len(t[1][:-1]) == 0:
             proteins_test.append(t[0])
-            adj_test.append(torch.from_numpy(adj[i].toarray()))
+            #adj_test.append(torch.from_numpy(adj[i].toarray()))
             features_test.append(torch.from_numpy(features[i]).float())
             edge_index_test.append(edge_index[i])
-            edge_features_test.append(torch.from_numpy(edge_features[i]))
+            edge_features_test.append(torch.from_numpy(edge_features[i]).float())
         else:
-            adj_train.append(torch.from_numpy(adj[i].toarray()))
+            #adj_train.append(torch.from_numpy(adj[i].toarray()))
             features_train.append(torch.from_numpy(features[i]).float())
             y_train.append(torch.from_numpy(np.array(int(t[1][:-1]))))
             edge_index_train.append(edge_index[i])
-            edge_features_train.append(torch.from_numpy(edge_features[i]))
+            edge_features_train.append(torch.from_numpy(edge_features[i]).float())
 
 
 dataset = [Data(x=features_train[i], edge_index = edge_index_train[i], edge_attr = edge_features_train[i], y = y_train[i]) for i in range(len(y_train))]
