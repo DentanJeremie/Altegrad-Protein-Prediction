@@ -1,6 +1,7 @@
 from src.embeddings.tfidf import main as main_sequence
-from src.embeddings.structure_embedding import main as main_structure
+from src.embeddings.gnn import main as main_gnn
 from src.embeddings.protbert import main as main_protbert
 
 main_sequence()
-main_structure()
+main_gnn()
+main_protbert()

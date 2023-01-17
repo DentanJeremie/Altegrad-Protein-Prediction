@@ -124,9 +124,9 @@ class StructureData():
         :returns: The tuple  `(adjacency_matrixes, node_features, edge_features)`
         """
         if pca_reduction:
-            logger.info('Building raw structure data...')
-        else:
             logger.info('Building raw structure data reduced with PCA...')
+        else:
+            logger.info('Building raw structure data...')
 
         graph_indicator = np.loadtxt(project.graph_indicator, dtype=np.int64)
         _, graph_size = np.unique(graph_indicator, return_counts=True)

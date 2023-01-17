@@ -195,7 +195,7 @@ class SetsManager():
         if type(id) == int:
             return id in self.train_indexes
 
-        raise ValueError('Incorrect ID type provided.')
+        raise ValueError(f'Incorrect ID type provided: {id}')
 
     def is_validation(self, id: t.Union[str, int]) -> bool:
         """Given either a protein index or a protein ID, decides whether 
