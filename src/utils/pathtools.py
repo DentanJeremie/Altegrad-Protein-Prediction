@@ -138,6 +138,16 @@ class CustomizedPath():
 
         return result
 
+# ------------------ XGBOOST ------------------
+
+    @property
+    def xgboost_folder(self):
+        return self.mkdir_if_not_exists(self.output / 'xgboost')
+    
+    @property
+    def xgboost_parameters(self):
+        return self.xgboost_folder / 'params.json'
+
 # ------------------ EMBEDDINGS ------------------
 
     @property

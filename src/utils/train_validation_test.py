@@ -13,7 +13,7 @@ from src.utils.pathtools import project
 from src.utils.logging import logger
 
 PROP_VALIDATION = 0.05
-SEED = 42
+SEED = 2
 
 class SetsManager():
 

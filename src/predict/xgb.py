@@ -5,8 +5,9 @@ import typing as t
 
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import GridSearchCV, train_test_split
-from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
+from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score, log_loss
+from sklearn.preprocessing import LabelEncoder
 import xgboost
 
 from src.utils.constants import *
@@ -14,19 +15,38 @@ from src.utils.logging import logger
 from src.utils.pathtools import project
 from src.utils.train_validation_test import SetsManager, sets_manager
 
-INDEX_COLUMN = 'Unnamed: 0'
+XGB_PARAM_SEARCH = {
+    'max_depth': [2, 3, 4],
+    'learning_rate': [0.01, 0.02, 0.05, 0.1, 0.2],
+    'colsample_bytree': [0.3, 0.2, 0.5, 0.8],
+    'min_child_weight': [0.5, 1, 2],
+}
+XGB_DEFAULT_PARAM_TO_SEARCH = {
+    'max_depth': 5,
+    'learning_rate': 0.1,
+    'colsample_bytree': 0.8,
+    'min_child_weight': 2,
+}
+XGB_ADDITIONNAL_PARAM = {
+    'objective': 'multi:softmax',
+    'num_class': 18,
+    'eta': 0.3,
+    'subsample': 0.5,
+    'gamma': 1,
+    'eval_metric': 'logloss',
+}
+HEADER = (
+    'name,class0,class1,class2,class3,class4,class5,class6,'
+    'class7,class8,class9,class10,class11,class12,class13,'
+    'class14,class15,class16,class17'
+)
 
 
 class FinalClassifier(object):
 
-    def __init__(self, sets: SetsManager):
+    def __init__(self, sets: SetsManager = sets_manager):
         self.sets = sets
         self._trained = False
-
-        self.load_features()
-        self.init_classifier(tune_xgb=True)
-
-        logger.info('All features have been loaded, the classifier is initialized.')
     
     def load_features(self):
         """Loads the features to the classifier.
@@ -40,38 +60,52 @@ class FinalClassifier(object):
             logger.debug(f'Loading features for {feature}...')
 
             full_features[feature] = pd.read_csv(
-                project.get_latest_features(feature),
+                project.get_latest_embeddings(feature),
                 low_memory=False,
-            ).drop(INDEX_COLUMN, axis=1)
+            )
 
+         # Concatenating
+        logger.info('Concatenating loaded high-level features')
+        self.full_features: pd.DataFrame = pd.concat([
+            full_features[feature].add_prefix(f'{feature}-')
+            for feature in EMBEDDINGS
+        ], axis = 1)
+        
+        print(self.full_features)
+
+    def split_train_test(self):
+        """Splits the full_train set into train and test.
+        """
+        logger.info('Splitting into train validation test sets')
+
+        # Features
+        self.train_features = self.full_features.loc[self.sets.train_indexes]
+        self.validation_features = self.full_features.loc[self.sets.validation_indexes]
+        self.test_features = self.full_features.loc[self.sets.test_indexes]
 
         # Labels
-        self.full_train_labels = project.train[DATA_LABEL].to_frame()
-        logger.info(len(self.full_train_labels.index))
+        self.train_labels = [
+            self.sets.get_label(index)
+            for index in self.sets.train_indexes
+        ]
+        self.validation_labels = [
+            self.sets.get_label(index)
+            for index in self.sets.validation_indexes
+        ]
 
-    def split_train_test(self, test_size: float):
-        """Splits the full_train set into train and test.
-        :param test_size: The proportion of sample in the test set.
-        """
-        logger.info('Splitting into train and test set')
-        (
-            self.train_features,
-            self.test_features,
-            self.train_labels,
-            self.test_labels,
-        ) = train_test_split(
-            self.full_train_features,
-            self.full_train_labels,
-            test_size=test_size
-        )
+        # Label encoding for the labels
+        le = LabelEncoder()
+        self.train_labels = le.fit_transform(self.train_labels)
+        self.validation_labels = le.fit_transform(self.validation_labels)
+
         
     def init_classifier(self, tune_xgb = False, force_default = False):
         """Initiates the XGBoost classifier.
         """
         logger.info('Starting XGB tuning')
         self.dtrain = xgboost.DMatrix(self.train_features, label = self.train_labels)
-        self.dtest = xgboost.DMatrix(self.test_features, label = self.test_labels)
-        self.dsubmission = xgboost.DMatrix(self.submission_features)
+        self.dvalidation = xgboost.DMatrix(self.validation_features, label = self.validation_labels)
+        self.dtest = xgboost.DMatrix(self.test_features)
 
         if tune_xgb:
             searched_parameters = self.xgb_tuning()
@@ -89,10 +123,10 @@ class FinalClassifier(object):
         xgbc = xgboost.XGBClassifier(objective='multi:softmax', num_class=3)
         clf = GridSearchCV(estimator=xgbc, 
             param_grid=XGB_PARAM_SEARCH,
-            scoring='accuracy', 
+            scoring='neg_log_loss', 
             verbose=1
         )
-        clf.fit(self.full_train_features, self.full_train_labels)
+        clf.fit(self.train_features, self.train_labels)
         result = clf.best_params_
         logger.info('End of XGB tuning')
 
@@ -114,16 +148,12 @@ class FinalClassifier(object):
 
     def eval(self):
         logger.info('Evaluating the model')
-        test_predictions = self.trained_model.predict(self.dtest)
-        test_predictions = test_predictions.round(0).astype(int)
-        test_labels = np.array(self.test_labels[DATA_LABEL].values)
+        validation_predictions = self.trained_model.predict_proba(self.dvalidation)
+        validation_labels = np.array(self.validation_labels)
 
         # Metrics
         evaluation_results = {
-            'accuracy':accuracy_score(y_true=test_labels, y_pred=test_predictions),
-            'recall':recall_score(y_true=test_labels, y_pred=test_predictions, average='weighted', zero_division=0.0),
-            'precision':precision_score(y_true=test_labels, y_pred=test_predictions, average='weighted', zero_division=0.0),
-            'f1':f1_score(y_true=test_labels, y_pred=test_predictions, average='weighted', zero_division=0.0),
+            'log_loss':log_loss(y_true=validation_labels, y_pred=validation_predictions),
         }
         for metric in evaluation_results:
             logger.info(f'XGBoost evaluation: {metric}: {evaluation_results[metric]}')
@@ -138,23 +168,28 @@ class FinalClassifier(object):
             self.eval()
 
         # Loading the pair labels
-        test_ids = project.test[DATA_ID].values
+        test_ids = [
+            self.sets.index_to_protein(index)
+            for index in self.sets.test_indexes
+        ]
 
         logger.info('Computing predictions for the submission')
-        submission_predictions = self.trained_model.predict(self.dsubmission)
-        submission_predictions = submission_predictions.round(0).astype(int)
+        test_predictions = self.trained_model.predict(self.dtest)
 
         destination = project.get_new_submission_file()
         with destination.open('w') as f:
             csv_out = csv.writer(f, lineterminator='\n')
-            csv_out.writerow(['id','prediction'])
-            for i, row in zip(test_ids, submission_predictions):
+            csv_out.writerow(HEADER.split(','))
+            for i, row in zip(test_ids, test_predictions):
                 csv_out.writerow([i, row])
 
         logger.info(f'Submission stored at {project.as_relative(destination)}')
 
 def main():
     final_xgboost = FinalClassifier()
+    final_xgboost.load_features()
+    final_xgboost.split_train_test()
+    final_xgboost.init_classifier()
     final_xgboost.predict()
 
 if __name__ == '__main__':
