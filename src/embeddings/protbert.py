@@ -23,7 +23,7 @@ BERT_MODEL = 'Rostlab/prot_bert'
 ALBERT_MODEL = 'Rostlab/prot_albert'
 BERT_BFD_MODEL = 'Rostlab/prot_bert_bfd'
 XLNET_MODEL = 'Rostlab/prot_xlnet'
-N_COMPONENT_PCA = 2
+N_COMPONENT_PCA = 32
 
 
 class ProtBertClassifier():
@@ -65,7 +65,7 @@ class ProtBertClassifier():
         # Sequences
         self.sequences = [
             ' '.join(seq)
-            for seq in self.data.sequences[:3]
+            for seq in self.data.sequences
         ]
 
     def compute_reduce_save_bert(self):
