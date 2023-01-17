@@ -1,15 +1,11 @@
 import csv
-import json
-import os
 import typing as t
 
-import numpy as np
 import pandas as pd
-from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import accuracy_score, log_loss
 from sklearn.preprocessing import LabelEncoder
 from sklearn.linear_model import LogisticRegression
-import xgboost
+from sklearn.svm import SVC
 
 from src.utils.constants import *
 from src.utils.logging import logger
@@ -22,8 +18,11 @@ HEADER = (
     'class7,class8,class9,class10,class11,class12,class13,'
     'class14,class15,class16,class17'
 )
+USE_LOGIT = False
 LOGIT_SOLVER = 'liblinear'
-
+SVC_KERNEL = 'poly'
+SVC_C = 5
+SVC_GAMMA = 'scale'
 
 class FinalClassifier(object):
 
@@ -82,7 +81,10 @@ class FinalClassifier(object):
 
     def train(self):
         """TO BE COMPLETED"""
-        self.clf = LogisticRegression(solver=LOGIT_SOLVER)
+        if USE_LOGIT:
+            self.clf = LogisticRegression(solver=LOGIT_SOLVER)
+        else:
+            self.clf = SVC(kernel = SVC_KERNEL, C = SVC_C, gamma=SVC_GAMMA, probability=True)
         self.clf.fit(self.train_features, self.data.y_train)
     
     def eval(self):

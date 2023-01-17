@@ -19,14 +19,15 @@ from src.utils.structure_data import StructureData, structure_data, sparse_mx_to
 from src.utils.train_validation_test import SetsManager, sets_manager
 
 USE_PCA = False
-EPOCHS = 1
+EPOCHS = 200
 BATCH_SIZE = 64
-N_HIDDEN = 64
+N_HIDDEN = 96
 N_INPUT = 13 if USE_PCA else 86
 DROPOUT = 0.2
 LEARNING_RATE = 0.001
 N_CLASS = 18
-PATIENCE = 5
+PATIENCE = 10
+MIN_EPOCH = 50
 N_COMPONENT_PCA = 32
 
 class GNN(nn.Module):
@@ -67,7 +68,7 @@ class GNN(nn.Module):
         out = self.dropout(last_layer)
         out = self.fc4(out)
 
-        return F.log_softmax(out, dim=1), out
+        return F.log_softmax(out, dim=1), out, last_layer
 
 class StructureBaseline():
 
@@ -81,6 +82,11 @@ class StructureBaseline():
         self.model = GNN(N_INPUT, N_HIDDEN, DROPOUT, N_CLASS).to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=LEARNING_RATE)
         self.loss_function = nn.CrossEntropyLoss()
+
+        # Best performance
+        self.epoch_for_best_evaluation = -1
+        self.best_evaluation_loss = -1
+        self.weights_for_best_evaluation = None
 
 # ------------------ SPLIT TRAIN TEST ------------------
 
@@ -186,7 +192,7 @@ class StructureBaseline():
                 y_batch = torch.LongTensor(y_batch).to(self.device)
                 
                 self.optimizer.zero_grad()
-                output, _ = self.model(features_batch, adj_batch, idx_batch)
+                output, _, _ = self.model(features_batch, adj_batch, idx_batch)
                 loss = self.loss_function(output, y_batch)
                 train_loss += loss.item() * output.size(0)
                 count += output.size(0)
@@ -198,6 +204,11 @@ class StructureBaseline():
             valid_loss, valid_correct = self.eval()
             validation_losses.append(valid_loss)
             validation_corrects.append(valid_correct)
+
+            if valid_loss < self.best_evaluation_loss or self.best_evaluation_loss < 0:
+                self.best_evaluation_loss = valid_loss
+                self.weights_for_best_evaluation = self.model.state_dict()
+                self.epoch_for_best_evaluation = epoch
             
             logger.info(
                 f"Epoch: {epoch+1:03d}  "
@@ -208,7 +219,7 @@ class StructureBaseline():
                 f"time: {time.time() - t:.4f}s  "
             )
 
-            if len(validation_losses) > PATIENCE and min(validation_losses[-4:-1]) > validation_losses[-5]:
+            if len(validation_losses) > MIN_EPOCH and min(validation_losses[-4:-1]) > validation_losses[-5]:
                 logger.info('Overfitting detected (patience = 5). Stopping training.')
                 break
 
@@ -220,7 +231,6 @@ class StructureBaseline():
 
         :returns: The tuple(log_loss, prop_correct_preds)
         """
-        logger.info("Evaluating model...")
         self.model.eval()
 
         N_validation = len(self.adj_validation)  
@@ -252,13 +262,13 @@ class StructureBaseline():
             idx_batch = torch.LongTensor(idx_batch).to(self.device)
             y_batch = torch.LongTensor(y_batch).to(self.device)
             
-            output, _ = self.model(features_batch, adj_batch, idx_batch)
+            output, _, _ = self.model(features_batch, adj_batch, idx_batch)
             loss = self.loss_function(output, y_batch)
             total_loss += loss.item() * output.size(0)
             preds = output.max(1)[1].type_as(y_batch)
             total_correct += torch.sum(preds.eq(y_batch).double())
             count += output.size(0)
-
+        
         return (total_loss / count, total_correct / count)
 
 # ------------------ PREDICT ------------------
@@ -270,8 +280,12 @@ class StructureBaseline():
         logger.info('Computing the embeddings of all graphs...')
         N_full = len(self.adj_full)
 
+        logger.info(f'Loading best model from epoch {self.epoch_for_best_evaluation +1}')
+        self.model.load_state_dict(self.weights_for_best_evaluation)
         self.model.eval()
-        embeddings_list = list()
+
+        embeddings_last_list = list()
+        embeddings_previous_list = list()
         # Iterate over the batches
         for i in range(0, N_full, BATCH_SIZE):
             adj_batch = list()
@@ -292,31 +306,34 @@ class StructureBaseline():
             features_batch = torch.FloatTensor(features_batch).to(self.device)
             idx_batch = torch.LongTensor(idx_batch).to(self.device)
 
-            _, embedding = self.model(features_batch, adj_batch, idx_batch)
-            embeddings_list.append(embedding)
-            
-        embeddings = torch.cat(embeddings_list, dim = 0)
-        embeddings = embeddings.cpu().detach().numpy()
+            _, embedding_last, embedding_previous = self.model(features_batch, adj_batch, idx_batch)
+            embeddings_last_list.append(embedding_last)
+            embeddings_previous_list.append(embedding_previous)
 
-        if embeddings.shape[1] > 32:
-            logger.info(f'Doing PCA on the final embeddings (dim {embeddings.shape[1]} -> {N_COMPONENT_PCA})...')
-            # Scaling
-            embeddings_df = pd.DataFrame(embeddings)
-            scaler = StandardScaler()
-            scaled_embeddings  = scaler.fit_transform(embeddings_df)
-            # PCA
-            pca = PCA(n_components=N_COMPONENT_PCA)
-            reduced_embeddings = pca.fit_transform(scaled_embeddings)
+        for embeddings_list, name in zip(
+            (embeddings_last_list, embeddings_previous_list),
+            (GNN_EMBEDDING_LAST, GNN_EMBEDDING_PREVIOUS)
+        ):
+            embeddings = torch.cat(embeddings_list, dim = 0)
+            embeddings = embeddings.cpu().detach().numpy()
 
-        else:
-            logger.info(f'No PCA: embeddings dimension is {embedding.shape[1]} <= {N_COMPONENT_PCA}')
-            reduced_embeddings = embeddings
+            if embeddings.shape[1] > 32:
+                logger.info(f'Doing PCA on the {name} embeddings (dim {embeddings.shape[1]} -> {N_COMPONENT_PCA})...')
+                # Scaling
+                embeddings_df = pd.DataFrame(embeddings)
+                scaler = StandardScaler()
+                scaled_embeddings  = scaler.fit_transform(embeddings_df)
+                # PCA
+                pca = PCA(n_components=N_COMPONENT_PCA)
+                reduced_embeddings = pca.fit_transform(scaled_embeddings)
 
-        logger.info('Saving GNN embeddings...')
-        output_path = project.get_new_embedding_file(GNN_EMBEDDING)
-        pd.DataFrame(reduced_embeddings).to_csv(output_path, index=False)
+            else:
+                logger.info(f'No PCA: embeddings dimension is {embeddings.shape[1]} <= {N_COMPONENT_PCA}')
+                reduced_embeddings = embeddings
 
-        logger.info(f'Embeddings stored at {project.as_relative(output_path)}')
+            logger.info(f'Saving {name} embeddings...')
+            output_path = project.get_new_embedding_file(name)
+            pd.DataFrame(reduced_embeddings).to_csv(output_path, index=False)
 
 def main():
     structure_baseline = StructureBaseline()
