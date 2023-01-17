@@ -113,7 +113,6 @@ class CustomizedPath():
     def sequences(self) -> Path:
         return self.check_downloaded('sequences.txt')
 
-
 # ------------------ LOGS ------------------
 
     def get_log_file(self, logger_name: str) -> Path:

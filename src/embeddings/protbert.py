@@ -156,10 +156,13 @@ class ProtBertClassifier():
         logger.info('Saving XLNET embeddings...')
         pd.DataFrame(self._xlnet_embeddings).to_csv(project.get_new_embedding_file(XLNET_EMBEDDING), index=False)
     
-if __name__ == '__main__':
-    protbert = ProtBertClassifier()
 
+def main():
+    protbert = ProtBertClassifier()
     protbert.compute_reduce_save_bert()
     protbert.compute_reduce_save_albert()
     protbert.compute_reduce_save_bert_bfd()
     protbert.compute_reduce_save_xlnet()
+
+if __name__ == '__main__':
+    main()
