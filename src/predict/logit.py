@@ -22,7 +22,7 @@ USE_LOGIT = False
 LOGIT_SOLVER = 'liblinear'
 SVC_KERNEL = 'poly'
 SVC_C = 5
-SVC_GAMMA = 'scale'
+SVC_GAMMA = 'auto'
 
 class FinalClassifier(object):
 
