@@ -68,7 +68,11 @@ class ProtBertClassifier():
         """
         logger.info(f'Computing embedding for {len(self.data.sequences)} protein sequences...')
 
-        sequences = self.data.sequences[:10]
+        sequences = self.data.sequences[:32]
+        sequences = [
+            ' '.join(seq)
+            for seq in sequences
+        ]
 
         logger.info(f'Computing BERT embeddings')
         bert_embeddings_list = self.bert_pipeline(sequences)

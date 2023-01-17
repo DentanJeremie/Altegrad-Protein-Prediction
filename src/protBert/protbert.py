@@ -13,7 +13,7 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 output = project.output / 'prot_embeddings.h5'
 sequences = {
     k: item
-    for k, item in enumerate(sequence_data.sequences_validation[:10])
+    for k, item in enumerate(sequence_data.sequences_validation[:64])
 }
 
 def get_T5_model():
