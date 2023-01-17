@@ -12,6 +12,7 @@ from sklearn.decomposition import PCA
 import torch
 from transformers import AlbertTokenizer, XLNetTokenizer, AutoTokenizer, AutoModel, pipeline
 
+from src.utils.constants import *
 from src.utils.pathtools import project
 from src.utils.logging import logger
 from src.utils.sequence_data import SequenceData, sequence_data
@@ -22,7 +23,7 @@ BERT_MODEL = 'Rostlab/prot_bert'
 ALBERT_MODEL = 'Rostlab/prot_albert'
 BERT_BFD_MODEL = 'Rostlab/prot_bert_bfd'
 XLNET_MODEL = 'Rostlab/prot_xlnet'
-N_COMPONENT_PCA = 32
+N_COMPONENT_PCA = 2
 
 
 class ProtBertClassifier():
@@ -60,51 +61,22 @@ class ProtBertClassifier():
         self._albert_embeddings: t.Dict[str, np.ndarray] = None
         self._bert_bfd_embeddings: t.Dict[str, np.ndarray] = None
         self._xlnet_embeddings: t.Dict[str, np.ndarray] = None
-    
-    def compute_embeddings(self):
-        """Computes the embeddings of the proteins.
-        After execution, self.results is a dict{protein_index -> protein_embedding}
-        The embeddings are np.ndarray of size 1024.
-        """
-        logger.info(f'Computing embedding for {len(self.data.sequences)} protein sequences...')
 
-        sequences = self.data.sequences[:32]
-        sequences = [
+        # Sequences
+        self.sequences = [
             ' '.join(seq)
-            for seq in sequences
+            for seq in self.data.sequences[:3]
         ]
 
-        logger.info(f'Computing BERT embeddings')
-        bert_embeddings_list = self.bert_pipeline(sequences)
+    def compute_reduce_save_bert(self):
+        """Computes the embeddings, reduce them with PCA"""
+
+        logger.info(f'Computing BERT embeddings...')
+        bert_embeddings_list = self.bert_pipeline(self.sequences)
         self._bert_embeddings = [
             np.mean(np.array(embedding[0][1:-1]), axis = 0)
             for embedding in bert_embeddings_list
         ]
-
-        logger.info(f'Computing ALBERT embeddings')
-        albert_embeddings_list = self.albert_pipeline(sequences)
-        self._albert_embeddings = [
-            np.mean(np.array(embedding[0][1:-1]), axis = 0)
-            for embedding in albert_embeddings_list
-        ]
-
-        logger.info(f'Computing BERT BFD embeddings')
-        bert_bfd_embeddings_list = self.bert_bfd_pipeline(sequences)
-        self._bert_bfd_embeddings = [
-            np.mean(np.array(embedding[0][1:-1]), axis = 0)
-            for embedding in bert_bfd_embeddings_list
-        ]
-
-        logger.info(f'Computing XLNET embeddings')
-        xlnet_embeddings_list = self.xlnet_pipeline(sequences)
-        self._xlnet_embeddings = [
-            np.mean(np.array(embedding[0][1:-1]), axis = 0)
-            for embedding in xlnet_embeddings_list
-        ]
-
-    def reduce_embedddings(self):
-        """Does a PCA reduction on the embeddings.
-        """
 
         logger.info('Doing scaling and PCA for BERT embeddings...')
         # Scaling
@@ -115,6 +87,19 @@ class ProtBertClassifier():
         pca = PCA(n_components=N_COMPONENT_PCA)
         self._bert_embeddings = pca.fit_transform(scaled_embeddings)
 
+        logger.info('Saving BERT embeddings...')
+        pd.DataFrame(self._bert_embeddings).to_csv(project.get_new_embedding_file(BERT_EMBEDDING), index=False)
+
+    def compute_reduce_save_albert(self):
+        """Computes the embeddings, reduce them with PCA"""
+
+        logger.info(f'Computing ALBERT embeddings...')
+        albert_embeddings_list = self.albert_pipeline(self.sequences)
+        self._albert_embeddings = [
+            np.mean(np.array(embedding[0][1:-1]), axis = 0)
+            for embedding in albert_embeddings_list
+        ]
+
         logger.info('Doing scaling and PCA for ALBERT embeddings...')
         # Scaling
         embeddings_df = pd.DataFrame(self._albert_embeddings)
@@ -124,7 +109,20 @@ class ProtBertClassifier():
         pca = PCA(n_components=N_COMPONENT_PCA)
         self._albert_embeddings = pca.fit_transform(scaled_embeddings)
 
-        logger.info('Doing scaling and PCA for BERT BFD embeddings...')
+        logger.info('Saving ALBERT embeddings...')
+        pd.DataFrame(self._albert_embeddings).to_csv(project.get_new_embedding_file(ALBERT_EMBEDDING), index=False)
+
+    def compute_reduce_save_bert_bfd(self):
+        """Computes the embeddings, reduce them with PCA"""
+
+        logger.info(f'Computing BERT_BFD embeddings...')
+        bert_bfd_embeddings_list = self.bert_bfd_pipeline(self.sequences)
+        self._bert_bfd_embeddings = [
+            np.mean(np.array(embedding[0][1:-1]), axis = 0)
+            for embedding in bert_bfd_embeddings_list
+        ]
+
+        logger.info('Doing scaling and PCA for BERT_BFD embeddings...')
         # Scaling
         embeddings_df = pd.DataFrame(self._bert_bfd_embeddings)
         scaler = StandardScaler()
@@ -132,6 +130,19 @@ class ProtBertClassifier():
         # PCA
         pca = PCA(n_components=N_COMPONENT_PCA)
         self._bert_bfd_embeddings = pca.fit_transform(scaled_embeddings)
+
+        logger.info('Saving BERT_BFD embeddings...')
+        pd.DataFrame(self._bert_bfd_embeddings).to_csv(project.get_new_embedding_file(BERT_BFD_EMBEDDING), index=False)
+
+    def compute_reduce_save_xlnet(self):
+        """Computes the embeddings, reduce them with PCA"""
+
+        logger.info(f'Computing XLNET embeddings...')
+        xlnet_embeddings_list = self.xlnet_pipeline(self.sequences)
+        self._xlnet_embeddings = [
+            np.mean(np.array(embedding[0][1:-1]), axis = 0)
+            for embedding in xlnet_embeddings_list
+        ]
 
         logger.info('Doing scaling and PCA for XLNET embeddings...')
         # Scaling
@@ -142,21 +153,13 @@ class ProtBertClassifier():
         pca = PCA(n_components=N_COMPONENT_PCA)
         self._xlnet_embeddings = pca.fit_transform(scaled_embeddings)
 
-    def save_embeddings(self):
-        """Saves the embeddings to the disk.
-        """
-
-        path = project.output / 'embeddings' / 'protbert'
-        path.mkdir(parents=True, exist_ok=True)
-
-        pd.DataFrame(self._bert_embeddings).to_csv(path / 'bert_embeddings.csv')
-        pd.DataFrame(self._albert_embeddings).to_csv(path / 'albert_embeddings.csv')
-        pd.DataFrame(self._bert_bfd_embeddings).to_csv(path / 'bert_bfd_embeddings.csv')
-        pd.DataFrame(self._xlnet_embeddings).to_csv(path / 'xlnet_embeddings.csv')
-
+        logger.info('Saving XLNET embeddings...')
+        pd.DataFrame(self._xlnet_embeddings).to_csv(project.get_new_embedding_file(XLNET_EMBEDDING), index=False)
+    
 if __name__ == '__main__':
     protbert = ProtBertClassifier()
 
-    protbert.compute_embeddings()
-    protbert.reduce_embedddings()
-    protbert.save_embeddings()
+    protbert.compute_reduce_save_bert()
+    protbert.compute_reduce_save_albert()
+    protbert.compute_reduce_save_bert_bfd()
+    protbert.compute_reduce_save_xlnet()

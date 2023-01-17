@@ -155,7 +155,7 @@ class CustomizedPath():
 
     def get_new_embedding_file(self, embedding_name: str):
         """Returns a new embedding file for a given class.
-        Ex of class of embedding: `'hgp'`
+        Ex of class of embedding: `'prot_bert'`
 
         :param embedding_name: The class of embedding
         :returns: The path to the new file
@@ -168,7 +168,7 @@ class CustomizedPath():
 
     def get_latest_embeddings(self, embedding_name: str):
         """Returns the latest embedding file for a given class.
-        Ex of class of embedding: `'hgp'`
+        Ex of class of embedding: `'prot_bert'`
 
         :param embedding_name: The class of embedding
         :returns: The path to the embedding file
