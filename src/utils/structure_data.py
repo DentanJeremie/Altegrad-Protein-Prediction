@@ -195,9 +195,9 @@ class StructureData():
         :returns: The tuple  `(adjacency_matrixes, node_features, edge_features, edge_index)`
         """
         if pca_reduction:
-            logger.info('Building raw structure data for HGP...')
-        else:
             logger.info('Building raw structure data for HGP reduced with PCA...')
+        else:
+            logger.info('Building raw structure data for HGP...')
 
         graph_indicator = np.loadtxt(project.graph_indicator, dtype=np.int64)
         _, graph_size = np.unique(graph_indicator, return_counts=True)
@@ -237,10 +237,10 @@ class StructureData():
             adjacency_matrixes.append(raw_adjacency[idx_n:idx_n+graph_size[i],idx_n:idx_n+graph_size[i]])
             edge_features.append(edge_attr[idx_m:idx_m+adjacency_matrixes[i].nnz,:])
             node_features.append(node_attr[idx_n:idx_n+graph_size[i],:])
-            edge_index.append(torch.from_numpy(np.array([
-                edges[idx_m:idx_m+raw_adjacency[i].nnz][:,0],
-                edges[idx_m:idx_m+raw_adjacency[i].nnz][:,1],
-            ])))
+            edge_index_raw = torch.from_numpy(np.array([
+                edges[idx_m:idx_m+adjacency_matrixes[i].nnz][:,0], 
+                edges[idx_m:idx_m+adjacency_matrixes[i].nnz][:,1]]))
+            edge_index.append(edge_index_raw - edge_index_raw.min())
             idx_n += graph_size[i]
             idx_m += adjacency_matrixes[i].nnz
 
