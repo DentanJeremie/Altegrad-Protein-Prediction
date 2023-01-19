@@ -87,8 +87,9 @@ class DGCNN(nn.Module):
         x = self.pool(x)
         x = self.relu(self.conv4(x))
         x = x.view(x.size(0), -1)
-        out = self.relu(self.classifier_1(x))
-        out = self.drop_out(out)
-        classes = F.log_softmax(self.classifier_2(out), dim=-1)
+        last_layer = self.relu(self.classifier_1(x))
+        out = self.drop_out(last_layer)
+        out = self.classifier_2(out)
+        classes = F.log_softmax(out, dim=-1)
 
-        return classes
+        return classes, out, last_layer

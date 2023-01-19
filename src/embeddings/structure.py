@@ -138,7 +138,6 @@ class Structure():
             
 
     def load_data_hgp(self):
-        #TODO Test if this really works 
         # PCA ?
         if USE_PCA:
             node_features = self.data.reduced_node_features_hgp
@@ -165,8 +164,8 @@ class Structure():
 
             # Full
             #self.adj_full.append(self.data.adjacency_matrixes_hgp[index])
-            self.features_full.append(node_features[index])
-            self.edge_features_full.append(self.data.edge_features_hgp[index])
+            self.features_full.append(torch.from_numpy(node_features[index]).float())
+            self.edge_features_full.append(torch.from_numpy(self.data.edge_features_hgp[index]).float())
             self.edge_index_full.append(self.data.edge_index_hgp[index])
             self.proteins_full.append(self.sets.index_to_protein(index))
         
@@ -181,6 +180,12 @@ class Structure():
 # ------------------ TRAIN ------------------
 
     def train(self):
+        if self.pyg_format:
+            self.train_pyg()
+        else:
+            self.train_standard()
+    
+    def train_standard(self):
         """Trains the model.
         """
         logger.info('Starting the training of the model...')
@@ -256,7 +261,6 @@ class Structure():
         self._training_done = True
 
     def train_pyg(self):
-        #TODO Verify if this really works
         """Trains the model in pyg format.
         """
         logger.info('Starting the training of the model...')
@@ -274,7 +278,7 @@ class Structure():
                 self.model.train()
                 data_batch = data_batch.to(self.device)
                 self.optimizer.zero_grad()
-                output = self.model(data_batch)
+                output,_,_ = self.model(data_batch)
                 loss = self.loss_function(output, data_batch.y)
                 train_loss += loss.item() * output.size(0)
                 count += output.size(0)
@@ -353,7 +357,6 @@ class Structure():
         return (total_loss / count, total_correct / count)
     
     def eval_pyg(self):
-        #TODO 
         """Returns the log loss and the proportion of correct predictions on the validation set.
 
         :returns: The tuple(log_loss, prop_correct_preds)
@@ -368,7 +371,7 @@ class Structure():
         # Iterate over the batches
         for data_batch in self.val_loader:
             data_batch = data_batch.to(self.device)
-            output = self.model(data_batch)
+            output, _, _ = self.model(data_batch)
             loss = self.loss_function(output, data_batch.y)
             total_loss += loss.item() * output.size(0)
             preds = output.max(1)[1].type_as(data_batch.y)
@@ -379,8 +382,14 @@ class Structure():
 
         
 # ------------------ PREDICT ------------------
-
     def predict(self):
+        if self.pyg_format:
+            self.predict_pyg()
+        else:
+            self.predict_standard()
+
+
+    def predict_standard(self):
         """Makes the prediction and saves it.
         """
 
@@ -442,20 +451,66 @@ class Structure():
             output_path = project.get_new_embedding_file(name)
             pd.DataFrame(reduced_embeddings).to_csv(output_path, index=False)
 
+    def predict_pyg(self):
+        """Makes the prediction and saves it.
+        """
+        logger.info('Computing the embeddings of all graphs...')
+        N_full = len(self.features_full)
+
+        logger.info(f'Loading best model from epoch {self.epoch_for_best_evaluation +1}')
+        self.model.load_state_dict(self.weights_for_best_evaluation)
+        self.model.eval()
+
+        embeddings_last_list = list()
+        embeddings_previous_list = list()
+        # Creating dataloader
+        full_data = [Data(x = self.features_full[i], edge_index = self.edge_index_full[i], 
+            edge_attr = self.edge_features_full[i]) for i in range(N_full)]
+        full_loader = DataLoader(full_data, batch_size=BATCH_SIZE, shuffle=True)
+
+        # Iterate over the batches
+        for data_batch in full_loader:
+            data_batch = data_batch.to(self.device)
+            _, embedding_last, embedding_previous = self.model(data_batch)
+            embeddings_last_list.append(embedding_last)
+            embeddings_previous_list.append(embedding_previous)
+
+        for embeddings_list, name in zip(
+            (embeddings_last_list, embeddings_previous_list),
+            (GNN_EMBEDDING_LAST, GNN_EMBEDDING_PREVIOUS)
+        ):
+            embeddings = torch.cat(embeddings_list, dim = 0)
+            embeddings = embeddings.cpu().detach().numpy()
+
+            if embeddings.shape[1] > 32:
+                logger.info(f'Doing PCA on the {name} embeddings (dim {embeddings.shape[1]} -> {N_COMPONENT_PCA})...')
+                # Scaling
+                embeddings_df = pd.DataFrame(embeddings)
+                scaler = StandardScaler()
+                scaled_embeddings  = scaler.fit_transform(embeddings_df)
+                # PCA
+                pca = PCA(n_components=N_COMPONENT_PCA)
+                reduced_embeddings = pca.fit_transform(scaled_embeddings)
+
+            else:
+                logger.info(f'No PCA: embeddings dimension is {embeddings.shape[1]} <= {N_COMPONENT_PCA}')
+                reduced_embeddings = embeddings
+
+            logger.info(f'Saving {name} embeddings...')
+            output_path = project.get_new_embedding_file(name)
+            pd.DataFrame(reduced_embeddings).to_csv(output_path, index=False)
+
+
+
 def main():
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    #device = torch.device("cpu")
     #model = GNN(N_INPUT, N_HIDDEN, DROPOUT, N_CLASS).to(device)
     model = DGCNN(N_INPUT, N_CLASS).to(device)
     data = StructureData()
     structure= Structure(model, device, data)
     structure.split_train_validation()
-    if model.pyg_format:
-        structure.train_pyg()
-    else: 
-        structure.train()
-
-    #structure.predict()
+    structure.train()
+    structure.predict()
 
 if __name__ == '__main__':
     main()
