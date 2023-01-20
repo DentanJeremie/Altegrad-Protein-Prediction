@@ -56,7 +56,9 @@ class GNN(nn.Module):
 
 class DGCNN0(nn.Module):
     """
-    Just an example of a PYG model, not really good though
+    Just an example of a PYG model, not really good though.
+
+    UNUSED FOR NOW.
     """
     def __init__(self, num_features, num_classes):
         super(DGCNN0, self).__init__()
@@ -166,11 +168,15 @@ class DGCNN(nn.Module):
 class DGCNNConv(MessagePassing):
     """
     From https://github.com/diningphil/gnn-comparison
+
+    UNUSED FOR NOW.
     """
 
     def __init__(self, in_channels, out_channels):
         super(DGCNNConv, self).__init__(aggr='add')  # "Add" aggregation.
         self.lin = nn.Linear(in_channels, out_channels)
+
+        self.pyg_format = True
 
     def forward(self, x, edge_index):
         # x has shape [N, in_channels]

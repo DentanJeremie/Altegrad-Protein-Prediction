@@ -3,9 +3,7 @@ scipy
 scikit-learn
 matplotlib
 torch
-torch-scatter==1.4.0
-torch-sparse==0.4.3
-torch-cluster==1.4.5
-torch-geometric==1.3.2
+torch-geometric
 transformers
 xgboost
+pandas

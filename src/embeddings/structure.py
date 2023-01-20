@@ -1,4 +1,4 @@
-import csv
+import gc
 import time
 import typing as t
 
@@ -17,7 +17,7 @@ from src.utils.pathtools import project
 from src.utils.logging import logger
 from src.utils.structure_data import StructureData, structure_data, sparse_mx_to_torch_sparse_tensor
 from src.utils.train_validation_test import SetsManager, sets_manager
-from src.embeddings.graph_models import GNN, DGCNN, GraphSAGE, GraphGAT
+from src.embeddings.graph_models import GNN, DGCNN, DGCNNConv,GraphSAGE, GraphGAT
 
 from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
@@ -27,28 +27,51 @@ from torch_geometric.nn import global_add_pool as gap
 """
 In this module, we extend the StructureBaseline class in the gnn.py module in order to use other architectures.
 """
+# PCA
 USE_PCA = True
-EPOCHS = 200
-BATCH_SIZE = 64
-N_HIDDEN = 96
-N_INPUT = 13 if USE_PCA else 86
-DROPOUT = 0.2
+N_COMPONENT_PCA = 32
+
+# Learning
 LEARNING_RATE = 0.001
 N_CLASS = 18
 PATIENCE = 10
+EPOCHS = 300
 MIN_EPOCH = 50
-N_COMPONENT_PCA = 32
+BATCH_SIZE = 64
 
+# Models params
+N_HIDDEN = 96
+N_INPUT = 13 if USE_PCA else 86
+DROPOUT = 0.2
+N_HEAD = 4
 
-class Structure():
+# Modeles and names
+MODELS_AND_PREFIX = [
+    (GNN(N_INPUT, N_HIDDEN, DROPOUT, N_CLASS), GNN_EMBEDDING_LAST.split('_')[0]),
+    (DGCNN(N_INPUT, N_HIDDEN, N_CLASS), DGCNN_EMBEDDING_LAST.split('_')[0]),
+    (GraphSAGE(N_INPUT, N_HIDDEN, N_CLASS), GRAPHSAGE_EMBEDDING_LAST.split('_')[0]),
+    (GraphGAT(N_HEAD,N_INPUT, N_COMPONENT_PCA, N_CLASS), GRAPHGAT_EMBEDDING_LAST.split('_')[0]),
+]
+EMBEDDING_PREVIOUS_SUFFIX = '_previous'
+EMBEDDING_LAST_SUFFIX = '_last'
 
-    def __init__(self, model, device, data: StructureData = structure_data, sets: SetsManager = sets_manager):
+class StructureEmbeddings():
+
+    def __init__(
+            self,
+            model: torch.nn.Module,
+            model_name: str,
+            data: StructureData = structure_data,
+            sets: SetsManager = sets_manager
+        ):
         # Data
         self.data = data
         self.sets = sets
 
-        self.model = model
-        self.device = device
+        # Model
+        self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        self.model: torch.nn.Module = model.to(self.device)
+        self.model_name = model_name
         self.pyg_format = self.model.pyg_format
         self.optimizer = optim.Adam(self.model.parameters(), lr=LEARNING_RATE)
         self.loss_function = nn.CrossEntropyLoss()
@@ -59,8 +82,6 @@ class Structure():
         self.weights_for_best_evaluation = None
 
 # ------------------ SPLIT TRAIN TEST ------------------
-
-    
     
     def split_train_validation(self):
         """Splits the dataset into train and test.
@@ -75,8 +96,6 @@ class Structure():
         """
 
         logger.info('Getting data and separating between train and validation...')
-
-        
 
         # We only need to separate the data for train / validation
         # Indeed, at the end we compute the embedding for everybody,
@@ -136,7 +155,6 @@ class Structure():
             self.features_full.append(node_features[index])
             self.proteins_full.append(self.sets.index_to_protein(index))
             
-
     def load_data_hgp(self):
         # PCA ?
         if USE_PCA:
@@ -175,7 +193,6 @@ class Structure():
             edge_attr = self.edge_features_validation[i], y = self.y_validation[i]) for i in range(len(self.y_validation))]
         self.train_loader = DataLoader(self.training_data, batch_size=BATCH_SIZE, shuffle=True)
         self.val_loader = DataLoader(self.val_data, batch_size=BATCH_SIZE, shuffle=False)
-
 
 # ------------------ TRAIN ------------------
 
@@ -253,8 +270,8 @@ class Structure():
                 f"time: {time.time() - t:.4f}s  "
             )
 
-            if len(validation_losses) > MIN_EPOCH and min(validation_losses[-4:-1]) > validation_losses[-5]:
-                logger.info('Overfitting detected (patience = 5). Stopping training.')
+            if len(validation_losses) > MIN_EPOCH and min(validation_losses[-PATIENCE:]) > validation_losses[-PATIENCE-1]:
+                logger.info(f'Overfitting detected (patience = {PATIENCE}). Stopping training.')
                 break
 
         logger.info('Training: done !')
@@ -304,8 +321,8 @@ class Structure():
                 f"time: {time.time() - t:.4f}s  "
             )
 
-            if len(validation_losses) > MIN_EPOCH and min(validation_losses[-4:-1]) > validation_losses[-5]:
-                logger.info('Overfitting detected (patience = 5). Stopping training.')
+            if len(validation_losses) > MIN_EPOCH and min(validation_losses[-PATIENCE:]) > validation_losses[-PATIENCE-1]:
+                logger.info(f'Overfitting detected (patience = {PATIENCE}). Stopping training.')
                 break
 
         logger.info('Training: done !')
@@ -428,7 +445,7 @@ class Structure():
 
         for embeddings_list, name in zip(
             (embeddings_last_list, embeddings_previous_list),
-            (GNN_EMBEDDING_LAST, GNN_EMBEDDING_PREVIOUS)
+            (self.model_name + EMBEDDING_LAST_SUFFIX, self.model_name + EMBEDDING_PREVIOUS_SUFFIX)
         ):
             embeddings = torch.cat(embeddings_list, dim = 0)
             embeddings = embeddings.cpu().detach().numpy()
@@ -477,7 +494,7 @@ class Structure():
 
         for embeddings_list, name in zip(
             (embeddings_last_list, embeddings_previous_list),
-            (GNN_EMBEDDING_LAST, GNN_EMBEDDING_PREVIOUS)
+            (self.model_name + EMBEDDING_LAST_SUFFIX, self.model_name + EMBEDDING_PREVIOUS_SUFFIX)
         ):
             embeddings = torch.cat(embeddings_list, dim = 0)
             embeddings = embeddings.cpu().detach().numpy()
@@ -503,15 +520,19 @@ class Structure():
 
 
 def main():
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    #model = GNN(N_INPUT, N_HIDDEN, DROPOUT, N_CLASS).to(device)
-    #model = GraphSAGE(N_INPUT, N_HIDDEN, N_CLASS).to(device)
-    model = GraphGAT(4, N_INPUT, N_HIDDEN, N_CLASS).to(device)
-    data = StructureData()
-    structure= Structure(model, device, data)
-    structure.split_train_validation()
-    structure.train()
-    structure.predict()
+    for model, name in MODELS_AND_PREFIX:
+        logger.info(f'Running graph model {name}')
+        structure_embeddings = StructureEmbeddings(model, name, structure_data)
+        structure_embeddings.split_train_validation()
+        structure_embeddings.train()
+        structure_embeddings.predict()
+
+        # Clearing cache
+        logger.info(f'Clearing cache...')
+        del structure_embeddings
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
 if __name__ == '__main__':
     main()

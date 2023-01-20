@@ -1,3 +1,3 @@
-from src.predict.logit import main
+from src.predict.classifier import main
 
 main()
