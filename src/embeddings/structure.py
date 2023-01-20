@@ -17,7 +17,7 @@ from src.utils.pathtools import project
 from src.utils.logging import logger
 from src.utils.structure_data import StructureData, structure_data, sparse_mx_to_torch_sparse_tensor
 from src.utils.train_validation_test import SetsManager, sets_manager
-from src.embeddings.graph_models import GNN, DGCNN
+from src.embeddings.graph_models import GNN, DGCNN, GraphSAGE, GraphGAT
 
 from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
@@ -27,7 +27,7 @@ from torch_geometric.nn import global_add_pool as gap
 """
 In this module, we extend the StructureBaseline class in the gnn.py module in order to use other architectures.
 """
-USE_PCA = False
+USE_PCA = True
 EPOCHS = 200
 BATCH_SIZE = 64
 N_HIDDEN = 96
@@ -505,7 +505,8 @@ class Structure():
 def main():
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     #model = GNN(N_INPUT, N_HIDDEN, DROPOUT, N_CLASS).to(device)
-    model = DGCNN(N_INPUT, N_CLASS).to(device)
+    #model = GraphSAGE(N_INPUT, N_HIDDEN, N_CLASS).to(device)
+    model = GraphGAT(4, N_INPUT, N_HIDDEN, N_CLASS).to(device)
     data = StructureData()
     structure= Structure(model, device, data)
     structure.split_train_validation()
