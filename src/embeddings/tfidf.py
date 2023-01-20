@@ -2,7 +2,6 @@ import pandas as pd
 from sklearn.decomposition import TruncatedSVD
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-from src.utils.constants import SEQUENCE_BASELINE_FEATURE_NAME as FEATURE_NAME
 from src.utils.pathtools import project
 from src.utils.logging import logger
 from src.utils.sequence_data import SequenceData, sequence_data
