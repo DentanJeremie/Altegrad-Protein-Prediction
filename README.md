@@ -41,7 +41,7 @@ Then, you need to install `torch-geometric`, `torch-scatter` and `torch-sparse`.
 * `torch-sparse`: [https://pypi.org/project/torch-sparse/](https://pypi.org/project/torch-sparse/)
 * `torch-scatter`: [https://pypi.org/project/torch-scatter/](https://pypi.org/project/torch-scatter/)
 
-An easy way to do so is to set `CUDA` variable either to `cpu`, or `cu116` or `cu117` depending on your version of cuda, and the to get the wheels from Pypi. For example:
+An easy way to do so is to set `CUDA` variable either to `cpu`, or `cu116` or `cu117` depending on your version of cuda, and the to get the wheels from Pypi. For cuda >11.7, e.g. CUDA 12.0, you can use `cu117` as well. For example:
 
 ```bash
 export CUDA='cpu'
