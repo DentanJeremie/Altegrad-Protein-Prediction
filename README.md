@@ -52,7 +52,7 @@ pip install torch-scatter -f https://data.pyg.org/whl/torch-1.13.0+${CUDA}.html
 
 ### Precomputed embeddings
 
-Our prediction relies on embeddings of each proteins. This computation is really long, so we provide precomputed embeddings. They are available using the following link: [https://www.icloud.com/iclouddrive/058R2ZYAvPXvLt1IKELaqty_g#precomputedembeddings](https://www.icloud.com/iclouddrive/058R2ZYAvPXvLt1IKELaqty_g#precomputedembeddings)
+Our prediction relies on embeddings of each proteins. This computation is really long, so we provide precomputed embeddings. They are available using the following link: [https://www.icloud.com/iclouddrive/0b5Nghg-5oZnk5QDJfhKHc8cA#precomputedembeddings](https://www.icloud.com/iclouddrive/0b5Nghg-5oZnk5QDJfhKHc8cA#precomputedembeddings)
 
 Then, you should unzip and move the `embeddings` folder in `/output`, and it will be automatically recognized by our pipeline.
 
