@@ -58,7 +58,7 @@ Then, you should unzip and move the `embeddings` folder in `/output`, and it wil
 
 ## Run the code
 
-You first need to set up PYTHONPATH to the root of the project. Do do so, execute the following from the root:
+You first need to set up PYTHONPATH to the root of the project (**the root of the project is the parent of this README file**). Do do so, execute the following from the root:
 
 ```bash
 export PYTHONPATH=$(pwd)
